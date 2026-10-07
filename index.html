@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>WiGLE_MeRGE</title>
+<meta name="description" content="Merge multiple WiGLE CSV files into one upload. Runs entirely in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;600;800&family=Chivo+Mono:wght@400;500&display=swap">
+<style>
+html,body{margin:0}
+/* Layout: one narrow working column — drop zone, file log, merge bar. Reads like a field logbook. */
+:root {
+  --bg: #f3f5f4;
+  --panel: #ffffff;
+  --ink: #16211f;
+  --muted: #5d6a67;
+  --line: #d6dddb;
+  --accent: #d9601a;        /* signal orange */
+  --accent-ink: #ffffff;
+  --accent-soft: #fbe9dd;
+  --ok: #1d7a55;
+  --warn: #a8660a;
+  --bad: #b3352b;
+  --tint: #e8eeec;
+  --font-display: "Chivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Chivo", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Chivo Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111716; --panel: #19211f; --ink: #e6ecea; --muted: #94a29e; --line: #2c3734;
+    --accent: #f07a33; --accent-ink: #1a0d04; --accent-soft: #3a2416;
+    --ok: #4cc28e; --warn: #e3a447; --bad: #ef7a6e; --tint: #212b29;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111716; --panel: #19211f; --ink: #e6ecea; --muted: #94a29e; --line: #2c3734;
+  --accent: #f07a33; --accent-ink: #1a0d04; --accent-soft: #3a2416;
+  --ok: #4cc28e; --warn: #e3a447; --bad: #ef7a6e; --tint: #212b29;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-inline: 16px; padding-block: 28px 40px;
+}
+.wrap { max-width: 720px; margin: 0 auto; display: grid; gap: 22px; }
+
+header { display: grid; gap: 6px; }
+.brand {
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(30px, 7vw, 42px);
+  letter-spacing: -0.02em; line-height: 1.05; margin: 0;
+}
+.brand .x { color: var(--accent); }
+.tagline { margin: 0; color: var(--muted); max-width: 58ch; text-wrap: pretty; }
+.privacy {
+  display: inline-flex; align-items: center; gap: 8px; width: fit-content;
+  font-family: var(--font-mono); font-size: 12px; color: var(--ok);
+  border: 1px solid currentColor; border-radius: 999px; padding: 3px 10px; margin-top: 4px;
+}
+.privacy::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+/* Drop zone */
+.drop {
+  position: relative; border: 2px dashed var(--line); border-radius: 14px;
+  background: var(--panel); padding: 30px 20px; text-align: center;
+  display: grid; gap: 12px; justify-items: center;
+  transition: border-color .15s, background .15s;
+}
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop h2 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 19px; }
+.drop p { margin: 0; color: var(--muted); font-size: 14px; }
+.drop .or { font-family: var(--font-mono); font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+
+button {
+  font: 600 15px/1 var(--font-body); border-radius: 10px; cursor: pointer;
+  padding: 12px 18px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+}
+button:hover:not(:disabled) { border-color: var(--ink); }
+button:focus-visible, .linkbtn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.primary:hover:not(:disabled) { filter: brightness(1.06); border-color: var(--accent); }
+.linkbtn {
+  background: none; border: none; padding: 0; color: var(--muted); font: 400 13px var(--font-body);
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.linkbtn:hover { color: var(--ink); }
+input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+/* Stats */
+.stats {
+  display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+}
+.stat { background: var(--panel); padding: 12px 14px; display: grid; gap: 2px; min-width: 0; }
+.stat .k { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.stat .v { font-family: var(--font-mono); font-size: 22px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* File list */
+.listhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.listhead h3 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.files { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; }
+.files li {
+  display: grid; grid-template-columns: 6px minmax(0,1fr) auto; gap: 12px; align-items: center;
+  padding: 11px 12px 11px 0; border-top: 1px solid var(--line);
+}
+.files li:first-child { border-top: none; }
+.files .stripe { align-self: stretch; }
+.files li.ok .stripe { background: var(--ok); }
+.files li.skip .stripe { background: var(--bad); }
+.files li.warn .stripe { background: var(--warn); }
+.fname { font-family: var(--font-mono); font-size: 14px; overflow-wrap: anywhere; }
+.fmeta { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fmeta .why { color: var(--bad); }
+.fmeta .note { color: var(--warn); }
+.rm { padding: 6px 10px; font-size: 13px; font-weight: 400; color: var(--muted); }
+.empty { padding: 18px 14px; color: var(--muted); font-size: 14px; text-align: center; }
+
+/* Merge bar */
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.actions button { flex: 1 1 180px; }
+.result {
+  border: 1px solid var(--line); background: var(--tint); border-radius: 12px; padding: 14px 16px;
+  display: grid; gap: 4px; min-width: 0;
+}
+.result .out { font-family: var(--font-mono); font-size: 14px; overflow-wrap: anywhere; }
+.result .sub { font-size: 13px; color: var(--muted); }
+.msg { font-size: 13.5px; color: var(--muted); min-height: 1.5em; margin: 0; }
+.msg.err { color: var(--bad); }
+
+details { font-size: 14px; color: var(--muted); }
+details summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+details ol { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 4px; max-width: 62ch; }
+code { font-family: var(--font-mono); font-size: .92em; background: var(--tint); padding: 1px 5px; border-radius: 4px; }
+
+footer { font-size: 12.5px; color: var(--muted); display: flex; gap: 6px 14px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 14px; }
+footer a { color: inherit; }
+
+@media (max-width: 460px) {
+  .stat .v { font-size: 18px; }
+  .stat { padding: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 class="brand">WiGLE<span class="x">_</span>MeRGE</h1>
+    <p class="tagline">Combine your wardriving session CSVs into a single file, so you upload to WiGLE once instead of file by file.</p>
+    <span class="privacy">Files stay on your device. Nothing is uploaded.</span>
+  </header>
+
+  <section class="drop" id="drop" aria-label="Add WiGLE CSV files">
+    <h2>Drop WiGLE CSV files here</h2>
+    <span class="or">or</span>
+    <button type="button" class="primary" id="pick">Select files…</button>
+    <input type="file" id="fileInput" multiple accept=".csv,text/csv,text/comma-separated-values,text/plain">
+    <p>WigleWifi 1.4 / 1.6 format · Tab5 Wardriver, ADV_Wardriver, Marauder and others</p>
+  </section>
+
+  <section class="stats" aria-label="Totals">
+    <div class="stat"><span class="k">Files</span><span class="v" id="sFiles">0</span></div>
+    <div class="stat"><span class="k">Data rows</span><span class="v" id="sRows">0</span></div>
+    <div class="stat"><span class="k">Skipped</span><span class="v" id="sSkip">0</span></div>
+  </section>
+
+  <section style="display:grid;gap:8px">
+    <div class="listhead">
+      <h3>Files to merge</h3>
+      <span style="display:flex;gap:14px">
+        <button type="button" class="linkbtn" id="sample">Try with sample files</button>
+        <button type="button" class="linkbtn" id="clear" hidden>Clear all</button>
+      </span>
+    </div>
+    <ul class="files" id="files"><li class="empty">No files yet. Add the CSVs from your device's SD card.</li></ul>
+  </section>
+
+  <section style="display:grid;gap:10px">
+    <div class="actions">
+      <button type="button" class="primary" id="merge" disabled>Merge</button>
+      <button type="button" id="download" disabled>Download</button>
+    </div>
+    <div class="result" id="result" hidden>
+      <span class="out" id="outName"></span>
+      <span class="sub" id="outInfo"></span>
+    </div>
+    <p class="msg" id="msg" role="status" aria-live="polite"></p>
+  </section>
+
+  <details>
+    <summary>How it works</summary>
+    <ol>
+      <li>The two header lines (<code>WigleWifi-1.x,…</code> and the column names) are taken from the first file.</li>
+      <li>Every data row from every file is appended, in the order shown above (sorted by file name).</li>
+      <li>Duplicate rows are kept. WiGLE handles repeated observations itself.</li>
+      <li>Files that don't start with <code>WigleWifi</code>, or that use a different column layout than the first file, are skipped and marked in red.</li>
+      <li>Upload the merged file at wigle.net → Uploads.</li>
+    </ol>
+  </details>
+
+  <footer>
+    <span>WiGLE_MeRGE by Runaque</span>
+    <a href="https://github.com/Runaque/wigle-merge" target="_blank" rel="noopener">Source on GitHub</a>
+    <span>Not affiliated with WiGLE.net</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const state = { files: [], merged: null, mergedName: "" };
+  let nextId = 1;
+
+  // ---------- parsing ----------
+  function splitLines(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    return text.split(/\r\n|\n|\r/);
+  }
+  const normCols = line => line.split(",").map(c => c.trim().toLowerCase()).join(",");
+
+  function parseWigle(name, size, text) {
+    const lines = splitLines(text);
+    const entry = { id: nextId++, name, size, status: "ok", reason: "", note: "", pre: "", cols: "", rows: [], first: "", last: "" };
+    const pre = (lines[0] || "").trim();
+    if (!/^wiglewifi/i.test(pre)) {
+      entry.status = "skip";
+      entry.reason = pre ? "Not a WiGLE CSV (first line doesn't start with WigleWifi)" : "Empty file";
+      return entry;
+    }
+    entry.pre = lines[0].trim();
+    entry.cols = (lines[1] || "").trim();
+    if (!entry.cols) { entry.status = "skip"; entry.reason = "Missing column header line"; return entry; }
+    for (let i = 2; i < lines.length; i++) {
+      const l = lines[i];
+      if (l.trim() !== "") entry.rows.push(l);
+    }
+    // FirstSeen range (informational only)
+    const ci = entry.cols.split(",").map(c => c.trim().toLowerCase()).indexOf("firstseen");
+    if (ci >= 0 && entry.rows.length) {
+      let min = "", max = "";
+      for (const r of entry.rows) {
+        const v = (r.split(",")[ci] || "").trim();
+        if (!/^\d{4}-\d{2}-\d{2}/.test(v)) continue;
+        if (!min || v < min) min = v;
+        if (!max || v > max) max = v;
+      }
+      entry.first = min; entry.last = max;
+    }
+    if (!entry.rows.length) { entry.status = "warn"; entry.note = "Header only, no data rows"; }
+    return entry;
+  }
+
+  // Re-evaluate column compatibility against the first valid file
+  function reconcile() {
+    const natural = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    state.files.sort((a, b) => natural.compare(a.name, b.name));
+    let ref = null;
+    for (const f of state.files) {
+      if (f.status === "skip" && f.reason !== "colmismatch") continue;
+      if (f.reason === "colmismatch") { f.status = "ok"; f.reason = ""; if (!f.rows.length) { f.status = "warn"; } }
+      if (!ref) { ref = f; continue; }
+      if (normCols(f.cols) !== normCols(ref.cols)) { f.status = "skip"; f.reason = "colmismatch"; }
+    }
+    return ref;
+  }
+
+  // ---------- adding ----------
+  async function addFiles(list) {
+    const arr = Array.from(list || []);
+    if (!arr.length) return;
+    let dupes = 0;
+    for (const file of arr) {
+      if (state.files.some(f => f.name === file.name && f.size === file.size)) { dupes++; continue; }
+      let text = "";
+      try { text = await file.text(); }
+      catch { state.files.push({ id: nextId++, name: file.name, size: file.size, status: "skip", reason: "Could not read this file", rows: [] }); continue; }
+      state.files.push(parseWigle(file.name, file.size, text));
+    }
+    invalidate();
+    render();
+    if (dupes) say(`${dupes} file${dupes > 1 ? "s were" : " was"} already in the list and not added again.`);
+  }
+
+  function invalidate() {
+    state.merged = null; state.mergedName = "";
+    $("result").hidden = true;
+    say("");
+  }
+
+  // ---------- merging ----------
+  function today() {
+    const d = new Date(), p = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
+  function merge() {
+    const ref = reconcile();
+    const use = state.files.filter(f => f.status !== "skip");
+    if (!ref || !use.length) { say("Add at least one valid WiGLE CSV first.", true); return; }
+    const out = [ref.pre, ref.cols];
+    let rows = 0;
+    for (const f of use) { for (const r of f.rows) out.push(r); rows += f.rows.length; }
+    state.merged = out.join("\n") + "\n";
+    state.mergedName = `WiGLE_MeRGE_${today()}.csv`;
+    $("outName").textContent = state.mergedName;
+    $("outInfo").textContent = `${fmt(rows)} data rows from ${use.length} file${use.length > 1 ? "s" : ""} · ${bytes(new Blob([state.merged]).size)}`;
+    $("result").hidden = false;
+    render();
+    say("Merged. Download the file and upload it to WiGLE.");
+  }
+
+  async function download() {
+    if (!state.merged) return;
+    const blob = new Blob([state.merged], { type: "text/csv" });
+    // Inside a claude.ai artifact, downloads go through the viewer's save prompt.
+    try {
+      if (window.claude && typeof window.claude.use === "function") {
+        const dl = await window.claude.use("downloads");
+        if (dl) {
+          try { await dl.save({ filename: state.mergedName, data: blob }); say("Saved."); }
+          catch (e) { say(e && e.code === "declined" ? "Download cancelled." : "Couldn't save the file here: " + (e && e.message || "unknown error"), e && e.code !== "declined"); }
+          return;
+        }
+      }
+    } catch { /* fall through to a normal browser download */ }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = state.mergedName;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  // ---------- rendering ----------
+  const fmt = n => n.toLocaleString("en-US");
+  const bytes = n => n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(2) + " MB";
+  function say(text, err) { const m = $("msg"); m.textContent = text; m.classList.toggle("err", !!err); }
+
+  function render() {
+    const ref = reconcile();
+    const ul = $("files");
+    ul.textContent = "";
+    if (!state.files.length) {
+      const li = document.createElement("li"); li.className = "empty";
+      li.textContent = "No files yet. Add the CSVs from your device's SD card.";
+      ul.appendChild(li);
+    }
+    for (const f of state.files) {
+      const li = document.createElement("li"); li.className = f.status;
+      const stripe = document.createElement("span"); stripe.className = "stripe";
+      const body = document.createElement("div"); body.style.minWidth = "0";
+      const nm = document.createElement("div"); nm.className = "fname"; nm.textContent = f.name;
+      const meta = document.createElement("div"); meta.className = "fmeta";
+      if (f.status === "skip") {
+        const w = document.createElement("span"); w.className = "why";
+        w.textContent = "Skipped: " + (f.reason === "colmismatch"
+          ? `column layout differs from ${ref ? ref.name : "the first file"} (different WiGLE version?). Merge it separately.`
+          : f.reason);
+        meta.appendChild(w);
+      } else {
+        let t = `${fmt(f.rows.length)} rows · ${bytes(f.size)}`;
+        const v = (f.pre.match(/^WigleWifi-([\d.]+)/i) || [])[1];
+        if (v) t += ` · v${v}`;
+        if (f.first) t += ` · ${f.first.slice(0, 10)}${f.last && f.last.slice(0, 10) !== f.first.slice(0, 10) ? " → " + f.last.slice(0, 10) : ""}`;
+        meta.textContent = t;
+        if (f === ref && state.files.filter(x => x.status !== "skip").length > 1) {
+          const n = document.createElement("span"); n.textContent = " · headers taken from this file"; meta.appendChild(n);
+        }
+        if (f.note) { const n = document.createElement("span"); n.className = "note"; n.textContent = " · " + f.note; meta.appendChild(n); }
+      }
+      body.append(nm, meta);
+      const rm = document.createElement("button"); rm.type = "button"; rm.className = "rm";
+      rm.textContent = "Remove"; rm.setAttribute("aria-label", "Remove " + f.name);
+      rm.addEventListener("click", () => { state.files = state.files.filter(x => x.id !== f.id); invalidate(); render(); });
+      li.append(stripe, body, rm);
+      ul.appendChild(li);
+    }
+    const good = state.files.filter(f => f.status !== "skip");
+    $("sFiles").textContent = fmt(good.length);
+    $("sRows").textContent = fmt(good.reduce((s, f) => s + f.rows.length, 0));
+    $("sSkip").textContent = fmt(state.files.length - good.length);
+    $("merge").disabled = !good.length;
+    $("download").disabled = !state.merged;
+    $("download").classList.toggle("primary", !!state.merged);
+    $("clear").hidden = !state.files.length;
+  }
+
+  // ---------- sample data (fictional networks) ----------
+  function sampleFiles() {
+    const pre = "WigleWifi-1.4,appRelease=1.4.7,model=Sample,release=1.0,device=Sample,display=,board=ESP32-S3,brand=Sample";
+    const cols = "MAC,SSID,AuthMode,FirstSeen,Channel,RSSI,CurrentLatitude,CurrentLongitude,AltitudeMeters,AccuracyMeters,Type";
+    const mk = (n, day, seed) => {
+      const rows = [];
+      for (let i = 0; i < n; i++) {
+        const h = ((seed * 97 + i * 31) % 256).toString(16).padStart(2, "0");
+        const mac = `02:00:5e:${h}:${(i % 256).toString(16).padStart(2, "0")}:${(seed % 256).toString(16).padStart(2, "0")}`;
+        const lat = (50.8467 + (i * 0.0003)).toFixed(6), lon = (4.3525 + (i * 0.0004)).toFixed(6);
+        rows.push(`${mac},SampleNet-${seed}-${i},[WPA2-PSK-CCMP][ESS],2026-${day} 1${i % 10}:0${i % 6}:12,${1 + (i % 11)},-${55 + (i % 30)},${lat},${lon},31,5,WIFI`);
+      }
+      return [pre, cols, ...rows].join("\r\n") + "\r\n";
+    };
+    return [
+      new File([mk(14, "09-28", 1)], "SAMPLE_Wardriver_001.csv", { type: "text/csv" }),
+      new File([mk(23, "10-02", 2)], "SAMPLE_Wardriver_002.csv", { type: "text/csv" }),
+      new File(["SSID;Lat;Lon\nnot,a,wigle,file\n"], "SAMPLE_not_wigle.csv", { type: "text/csv" })
+    ];
+  }
+
+  // ---------- wiring ----------
+  const drop = $("drop");
+  $("pick").addEventListener("click", () => $("fileInput").click());
+  $("fileInput").addEventListener("change", e => { addFiles(e.target.files); e.target.value = ""; });
+  ["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); if (t === "dragleave" && drop.contains(e.relatedTarget)) return; drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => addFiles(e.dataTransfer && e.dataTransfer.files));
+  // Dropping outside the zone shouldn't navigate away
+  window.addEventListener("dragover", e => e.preventDefault());
+  window.addEventListener("drop", e => { e.preventDefault(); if (!drop.contains(e.target)) addFiles(e.dataTransfer && e.dataTransfer.files); });
+  $("merge").addEventListener("click", merge);
+  $("download").addEventListener("click", download);
+  $("clear").addEventListener("click", () => { state.files = []; invalidate(); render(); });
+  $("sample").addEventListener("click", () => addFiles(sampleFiles()));
+
+  render();
+})();
+</script>
+</body>
+</html>
