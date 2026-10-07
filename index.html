@@ -45,6 +45,7 @@ html,body{margin:0}
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   background: var(--bg); color: var(--ink);
   font-family: var(--font-body); font-size: 15px; line-height: 1.5;
@@ -121,7 +122,7 @@ input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; poin
 .fmeta .why { color: var(--bad); }
 .fmeta .note { color: var(--warn); }
 .rm { padding: 6px 10px; font-size: 13px; font-weight: 400; color: var(--muted); }
-.empty { padding: 18px 14px; color: var(--muted); font-size: 14px; text-align: center; }
+.files li.empty { display: block; padding: 18px 14px; color: var(--muted); font-size: 14px; text-align: center; }
 
 /* Merge bar */
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
