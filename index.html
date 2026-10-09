@@ -184,11 +184,11 @@ footer a { color: inherit; }
   </header>
 
   <section class="drop" id="drop" aria-label="Add WiGLE CSV files">
-    <h2>Drop WiGLE CSV files here</h2>
+    <h2>Drop WiGLE CSV or LOG files here</h2>
     <span class="or">or</span>
     <button type="button" class="primary" id="pick">Select files…</button>
-    <input type="file" id="fileInput" multiple accept=".csv,text/csv,text/comma-separated-values,text/plain">
-    <p>WigleWifi 1.4 / 1.6 format · Tab5 Wardriver, ADV_Wardriver, Marauder and others</p>
+    <input type="file" id="fileInput" multiple accept=".csv,.log,.txt,text/csv,text/comma-separated-values,text/plain">
+    <p>WigleWifi 1.4 / 1.6 format (.csv or .log) · Tab5 Wardriver, ADV_Wardriver, Marauder and others</p>
   </section>
 
   <section class="stats" aria-label="Totals">
@@ -205,7 +205,7 @@ footer a { color: inherit; }
         <button type="button" class="linkbtn" id="clear" hidden>Clear all</button>
       </span>
     </div>
-    <ul class="files" id="files"><li class="empty">No files yet. Add the CSVs from your device's SD card.</li></ul>
+    <ul class="files" id="files"><li class="empty">No files yet. Add the .csv or .log files from your device's SD card.</li></ul>
   </section>
 
   <section style="display:grid;gap:10px">
@@ -269,7 +269,7 @@ footer a { color: inherit; }
     const pre = (lines[0] || "").trim();
     if (!/^wiglewifi/i.test(pre)) {
       entry.status = "skip";
-      entry.reason = pre ? "Not a WiGLE CSV (first line doesn't start with WigleWifi)" : "Empty file";
+      entry.reason = pre ? "Not a WiGLE file (first line doesn't start with WigleWifi)" : "Empty file";
       return entry;
     }
     entry.pre = lines[0].trim();
@@ -341,7 +341,7 @@ footer a { color: inherit; }
   // ---------- device detection ----------
   // "ADV_Wardriver_001.csv" -> "ADV_Wardriver"; "WiGLE_MeRGE_2026-10-07.csv" -> "WiGLE"
   function filePrefix(name) {
-    let p = String(name).replace(/\.csv$/i, "");
+    let p = String(name).replace(/\.(csv|log|txt)$/i, "");
     p = p.replace(/([_\-\s.]*\(?\d+\)?)+$/, "");   // session numbers, dates, "(1)" copies
     p = p.replace(/[_\-\s]*MeRGE$/i, "");            // earlier merges
     return p.replace(/[_\-\s.]+$/, "");
@@ -385,7 +385,7 @@ footer a { color: inherit; }
   }
 
   function cleanName(v) {
-    return String(v || "").trim().replace(/\.csv$/i, "")
+    return String(v || "").trim().replace(/\.(csv|log|txt)$/i, "")
       .replace(/[\\/:*?"<>|\x00-\x1f]+/g, "_").replace(/\s+/g, "_").slice(0, 120);
   }
   function currentName() {
@@ -458,7 +458,7 @@ footer a { color: inherit; }
     ul.textContent = "";
     if (!state.files.length) {
       const li = document.createElement("li"); li.className = "empty";
-      li.textContent = "No files yet. Add the CSVs from your device's SD card.";
+      li.textContent = "No files yet. Add the .csv or .log files from your device's SD card.";
       ul.appendChild(li);
     }
     for (const f of state.files) {
