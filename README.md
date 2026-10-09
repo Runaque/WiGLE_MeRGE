@@ -7,7 +7,7 @@ How it works is extremely straightforward! Just drag and drop them, hit the "Mer
 
 ## The MeRGE
 
-**👉 Use it here: [runaque.github.io/wigle-merge](https://runaque.github.io/wigle-merge)**
+**👉 Use it here: [runaque.github.io/wigle-merge](https://runaque.github.io/WiGLE_MeRGE/)**
 
 ## Support
 
